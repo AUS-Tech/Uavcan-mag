@@ -150,8 +150,57 @@ void init()
         board::die();
     }
 
+    /*
+     * The dynamic node ID allocation protocol allows the allocatee to ask the allocator for some particular node ID
+     * value, if necessary. This feature is optional. By default, if no preference has been declared, the allocator
+     * will pick any free node ID at its own discretion.
+     */
+    int preferred_node_id = 0;
 
-    getNode().setNodeID(21);
+    /*
+     * Initializing the dynamic node ID allocation client.
+     * By default, the client will use TransferPriority::OneHigherThanLowest for communications with the allocator;
+     * this can be overriden through the third argument to the start() method.
+     */
+    uavcan::DynamicNodeIDClient client(getNode());
+
+    // int client_start_res = client.start(getNode().getHardwareVersion().unique_id,    // USING THE SAME UNIQUE ID AS ABOVE
+    //                                     preferred_node_id);
+
+    int client_start_res = client.start(getNode().getHardwareVersion().unique_id    // USING THE SAME UNIQUE ID AS ABOVE
+                                        );
+
+    if (client_start_res < 0)
+    {
+        // throw std::runtime_error("Failed to start the dynamic node ID client: " + std::to_string(client_start_res));
+    }
+
+    /*
+     * Waiting for the client to obtain for us a node ID.
+     * This may take a few seconds.
+     */
+    // std::cout << "Allocation is in progress" << std::flush;
+    while (!client.isAllocationComplete())
+    {
+        board::resetWatchdog();
+        const int res = getNode().spin(uavcan::MonotonicDuration::fromMSec(200));    // Spin duration doesn't matter
+        if (res < 0)
+        {
+            // std::cerr << "Transient failure: " << res << std::endl;
+        }
+        // std::cout << "." << std::flush;
+    }
+    // std::cout << "\nDynamic node ID "
+    //           << int(client.getAllocatedNodeID().get())
+    //           << " has been allocated by the allocator with node ID "
+    //           << int(client.getAllocatorNodeID().get()) << std::endl;
+
+
+    // getNode().setNodeID(21);
+
+    // getNode().setNodeID(32);
+
+    getNode().setNodeID(client.getAllocatedNodeID());
 
     board::resetWatchdog();
 
